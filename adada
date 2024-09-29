@@ -1,12 +1,12 @@
 -- Variables
 local aimbotEnabled = false -- Controls whether the aimbot is active (hold right-click)
-local espEnabled = false -- Controls the toggle state of ESP (press "P")
+local espEnabled = false -- Controls the toggle state of ESP (back mouse button)
 local targetHead = nil -- Reference to the player's head being tracked
 local highlightObjects = {} -- Table to hold all ESP highlight objects
 
 -- Keybinds
 local aimbotKey = Enum.UserInputType.MouseButton2 -- Right-click (hold)
-local espToggleKey = Enum.KeyCode.P -- Key "P" for toggling ESP
+local espToggleKey = Enum.UserInputType.MouseButton4 -- Back mouse button for toggling ESP
 
 -- Function to create or update the highlight object (ESP)
 local function highlightPlayer(player)
@@ -45,9 +45,9 @@ local function disableESP()
     highlightObjects = {} -- Clear the table
 end
 
--- Function to toggle ESP on/off with "P"
+-- Function to toggle ESP on/off with the back mouse button
 game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == espToggleKey then
+    if input.UserInputType == espToggleKey then
         espEnabled = not espEnabled -- Toggle ESP
         if espEnabled then
             enableESP() -- Enable ESP
