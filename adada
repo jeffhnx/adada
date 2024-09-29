@@ -1,54 +1,96 @@
 -- Variables
 local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
+local camera = game.Workspace.CurrentCamera
+local espEnabled = true -- ESP is enabled by default
 
--- Function to make the player invisible
-local function makeInvisible()
-    -- Loop through all the parts in the character's model
-    for _, part in pairs(character:GetDescendants()) do
-        -- Check if the part is a BasePart (i.e., a physical part of the character)
-        if part:IsA("BasePart") then
-            part.Transparency = 1 -- Set transparency to 100% (invisible)
-        elseif part:IsA("Decal") or part:IsA("Texture") then
-            part.Transparency = 1 -- Set decal or texture transparency to invisible
-        end
-    end
+-- Table to store highlight (ESP) objects
+local highlightObjects = {}
 
-    -- Disable face if one exists
-    local face = character:FindFirstChildWhichIsA("Decal")
-    if face then
-        face.Transparency = 1
+-- Function to create a rainbow effect
+local function getRainbowColor(t)
+    local r = math.sin(t) * 0.5 + 0.5
+    local g = math.sin(t + 2 * math.pi / 3) * 0.5 + 0.5
+    local b = math.sin(t + 4 * math.pi / 3) * 0.5 + 0.5
+    return Color3.new(r, g, b)
+end
+
+-- Function to create or update the highlight object (ESP)
+local function highlightPlayer(player)
+    local highlight = highlightObjects[player.Name]
+    
+    -- If ESP object doesn't exist, create a new one
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Adornee = player.Character
+        highlight.FillTransparency = 0.5 -- Semi-transparent glow
+        highlight.OutlineTransparency = 0 -- Visible outline
+        highlightObjects[player.Name] = highlight
+        highlight.Parent = player.Character
     end
 end
 
--- Function to make the player visible again
-local function makeVisible()
-    -- Loop through all the parts in the character's model
-    for _, part in pairs(character:GetDescendants()) do
-        -- Check if the part is a BasePart
-        if part:IsA("BasePart") then
-            part.Transparency = 0 -- Set transparency back to 0% (fully visible)
-        elseif part:IsA("Decal") or part:IsA("Texture") then
-            part.Transparency = 0 -- Set decal or texture transparency back to visible
+-- Function to update ESP colors (rainbow glow effect)
+local function updateESPColors()
+    local t = tick() -- Get the time to adjust rainbow color dynamically
+    for _, highlight in pairs(highlightObjects) do
+        if highlight and highlight.Parent then
+            highlight.FillColor = getRainbowColor(t)
+            highlight.OutlineColor = getRainbowColor(t + 0.5) -- Slight offset for outline
         end
-    end
-
-    -- Enable face if one exists
-    local face = character:FindFirstChildWhichIsA("Decal")
-    if face then
-        face.Transparency = 0
     end
 end
 
--- Toggle invisibility on/off with a key (for example, "I")
-local isInvisible = false
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.I then -- "I" key to toggle invisibility
-        isInvisible = not isInvisible
-        if isInvisible then
-            makeInvisible()
-        else
-            makeVisible()
+-- Function to find the closest player's head while avoiding tracking through walls
+local function getClosestVisiblePlayerHead()
+    local players = game.Players:GetPlayers()
+    local closestDistance = math.huge
+    local closestHead = nil
+
+    for _, targetPlayer in pairs(players) do
+        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
+            local headPosition = targetPlayer.Character.Head.Position
+            local screenPosition, onScreen = camera:WorldToScreenPoint(headPosition)
+
+            -- Raycast to check if there's a direct line of sight (no walls in the way)
+            local origin = camera.CFrame.Position
+            local direction = (headPosition - origin).unit * (headPosition - origin).magnitude
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+            raycastParams.FilterDescendantsInstances = {player.Character} -- Ignore the local player's own character
+
+            local result = game.Workspace:Raycast(origin, direction, raycastParams)
+            if result and result.Instance:IsDescendantOf(targetPlayer.Character) then
+                -- If there's a direct line of sight, check the distance
+                local distance = (headPosition - camera.CFrame.Position).magnitude
+                if distance < closestDistance and onScreen then
+                    closestDistance = distance
+                    closestHead = targetPlayer.Character.Head
+                end
+            end
         end
+    end
+
+    return closestHead
+end
+
+-- Function to aim at the target player's head
+local function aimAtTarget(targetHead)
+    if targetHead then
+        camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)
+    end
+end
+
+-- Update ESP and aimbot every frame
+game:GetService("RunService").RenderStepped:Connect(function()
+    -- Update ESP colors
+    if espEnabled then
+        updateESPColors()
+    end
+
+    -- Find the closest visible head
+    local targetHead = getClosestVisiblePlayerHead()
+    if targetHead then
+        aimAtTarget(targetHead) -- Track the closest player's head if visible
     end
 end)
