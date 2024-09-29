@@ -2,9 +2,7 @@
 local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local camera = game.Workspace.CurrentCamera
-local espEnabled = true -- ESP is enabled by default
-
--- Table to store highlight (ESP) objects
+local espEnabled = false -- ESP starts off
 local highlightObjects = {}
 
 -- Function to create a rainbow effect
@@ -16,27 +14,24 @@ local function getRainbowColor(t)
 end
 
 -- Function to create or update the highlight object (ESP)
-local function highlightPlayer(player)
-    local highlight = highlightObjects[player.Name]
-    
-    -- If ESP object doesn't exist, create a new one
-    if not highlight then
-        highlight = Instance.new("Highlight")
-        highlight.Adornee = player.Character
+local function highlightPlayer(targetPlayer)
+    if not highlightObjects[targetPlayer.Name] then
+        local highlight = Instance.new("Highlight")
+        highlight.Adornee = targetPlayer.Character
         highlight.FillTransparency = 0.5 -- Semi-transparent glow
         highlight.OutlineTransparency = 0 -- Visible outline
-        highlightObjects[player.Name] = highlight
-        highlight.Parent = player.Character
+        highlightObjects[targetPlayer.Name] = highlight
+        highlight.Parent = targetPlayer.Character
     end
 end
 
 -- Function to update ESP colors (rainbow glow effect)
 local function updateESPColors()
-    local t = tick() -- Get the time to adjust rainbow color dynamically
+    local t = tick()
     for _, highlight in pairs(highlightObjects) do
         if highlight and highlight.Parent then
             highlight.FillColor = getRainbowColor(t)
-            highlight.OutlineColor = getRainbowColor(t + 0.5) -- Slight offset for outline
+            highlight.OutlineColor = getRainbowColor(t + 0.5)
         end
     end
 end
@@ -57,7 +52,7 @@ local function getClosestVisiblePlayerHead()
             local direction = (headPosition - origin).unit * (headPosition - origin).magnitude
             local raycastParams = RaycastParams.new()
             raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-            raycastParams.FilterDescendantsInstances = {player.Character} -- Ignore the local player's own character
+            raycastParams.FilterDescendantsInstances = {player.Character} -- Ignore local player's character
 
             local result = game.Workspace:Raycast(origin, direction, raycastParams)
             if result and result.Instance:IsDescendantOf(targetPlayer.Character) then
@@ -81,6 +76,46 @@ local function aimAtTarget(targetHead)
     end
 end
 
+-- Toggle ESP on/off with "E"
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessedEvent)
+    if not gameProcessedEvent then
+        if input.KeyCode == Enum.KeyCode.E then
+            espEnabled = not espEnabled
+            if espEnabled then
+                -- Highlight all players for ESP
+                local players = game.Players:GetPlayers()
+                for _, targetPlayer in pairs(players) do
+                    if targetPlayer ~= player and targetPlayer.Character then
+                        highlightPlayer(targetPlayer)
+                    end
+                end
+            else
+                -- Clear highlights
+                for _, highlight in pairs(highlightObjects) do
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+                highlightObjects = {}
+            end
+        end
+    end
+end)
+
+-- Detect holding right-click for aimbot
+local aimbotEnabled = false
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aimbotEnabled = true -- Enable aimbot (tracking)
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aimbotEnabled = false -- Disable aimbot (tracking stops)
+    end
+end)
+
 -- Update ESP and aimbot every frame
 game:GetService("RunService").RenderStepped:Connect(function()
     -- Update ESP colors
@@ -89,8 +124,8 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 
     -- Find the closest visible head
-    local targetHead = getClosestVisiblePlayerHead()
-    if targetHead then
+    if aimbotEnabled then
+        local targetHead = getClosestVisiblePlayerHead()
         aimAtTarget(targetHead) -- Track the closest player's head if visible
     end
 end)
