@@ -1,113 +1,54 @@
 -- Variables
-local aimbotEnabled = false -- Controls whether the aimbot is active (hold right-click)
-local espEnabled = false -- Controls the toggle state of ESP (back mouse button)
-local targetHead = nil -- Reference to the player's head being tracked
-local highlightObjects = {} -- Table to hold all ESP highlight objects
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
 
--- Keybinds
-local aimbotKey = Enum.UserInputType.MouseButton2 -- Right-click (hold)
-local espToggleKey = Enum.UserInputType.MouseButton4 -- Back mouse button for toggling ESP
-
--- Function to create or update the highlight object (ESP)
-local function highlightPlayer(player)
-    -- Create a new Highlight object for ESP
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = player.Character -- Attach to the player's character
-    highlight.FillColor = Color3.new(1, 0, 0) -- Red color
-    highlight.FillTransparency = 0.7 -- Transparency for ESP
-    highlight.OutlineTransparency = 0 -- Make outline visible
-    highlight.OutlineColor = Color3.new(1, 1, 1) -- White outline
-    highlight.Parent = player.Character -- Parent it to the player's character
-
-    -- Add the highlight to the table to track it
-    highlightObjects[player.Name] = highlight
-end
-
--- Function to add ESP to all players
-local function enableESP()
-    local players = game.Players:GetPlayers()
-    local localPlayer = game.Players.LocalPlayer
-
-    for _, player in pairs(players) do
-        if player ~= localPlayer and player.Character then
-            highlightPlayer(player) -- Highlight each player
+-- Function to make the player invisible
+local function makeInvisible()
+    -- Loop through all the parts in the character's model
+    for _, part in pairs(character:GetDescendants()) do
+        -- Check if the part is a BasePart (i.e., a physical part of the character)
+        if part:IsA("BasePart") then
+            part.Transparency = 1 -- Set transparency to 100% (invisible)
+        elseif part:IsA("Decal") or part:IsA("Texture") then
+            part.Transparency = 1 -- Set decal or texture transparency to invisible
         end
+    end
+
+    -- Disable face if one exists
+    local face = character:FindFirstChildWhichIsA("Decal")
+    if face then
+        face.Transparency = 1
     end
 end
 
--- Function to remove ESP from all players
-local function disableESP()
-    for _, highlight in pairs(highlightObjects) do
-        if highlight then
-            highlight:Destroy() -- Remove the highlight object
+-- Function to make the player visible again
+local function makeVisible()
+    -- Loop through all the parts in the character's model
+    for _, part in pairs(character:GetDescendants()) do
+        -- Check if the part is a BasePart
+        if part:IsA("BasePart") then
+            part.Transparency = 0 -- Set transparency back to 0% (fully visible)
+        elseif part:IsA("Decal") or part:IsA("Texture") then
+            part.Transparency = 0 -- Set decal or texture transparency back to visible
         end
     end
-    highlightObjects = {} -- Clear the table
+
+    -- Enable face if one exists
+    local face = character:FindFirstChildWhichIsA("Decal")
+    if face then
+        face.Transparency = 0
+    end
 end
 
--- Function to toggle ESP on/off with the back mouse button
+-- Toggle invisibility on/off with "P"
+local isInvisible = false
 game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.UserInputType == espToggleKey then
-        espEnabled = not espEnabled -- Toggle ESP
-        if espEnabled then
-            enableESP() -- Enable ESP
+    if input.KeyCode == Enum.KeyCode.P then -- "P" key to toggle invisibility
+        isInvisible = not isInvisible
+        if isInvisible then
+            makeInvisible()
         else
-            disableESP() -- Disable ESP
+            makeVisible()
         end
-    end
-end)
-
--- Function to find the closest player's head
-local function getClosestPlayerHead()
-    local players = game.Players:GetPlayers()
-    local localPlayer = game.Players.LocalPlayer
-    local camera = game.Workspace.CurrentCamera
-    local closestDistance = math.huge
-    local closestHead = nil
-
-    for _, player in pairs(players) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local headPosition = player.Character.Head.Position
-            local screenPosition, onScreen = camera:WorldToScreenPoint(headPosition)
-            local mousePosition = game.Players.LocalPlayer:GetMouse().Hit.Position
-            local distance = (mousePosition - headPosition).magnitude
-
-            if distance < closestDistance and onScreen then
-                closestDistance = distance
-                closestHead = player.Character.Head
-            end
-        end
-    end
-
-    return closestHead
-end
-
--- Function to aim at the target player's head
-local function aimAtTarget()
-    local camera = game.Workspace.CurrentCamera
-    if targetHead then
-        camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)
-    end
-end
-
--- Detect holding right-click for aimbot
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.UserInputType == aimbotKey then
-        aimbotEnabled = true -- Enable aimbot (tracking)
-        targetHead = getClosestPlayerHead() -- Set the target to the closest player's head
-    end
-end)
-
-game:GetService("UserInputService").InputEnded:Connect(function(input)
-    if input.UserInputType == aimbotKey then
-        aimbotEnabled = false -- Disable aimbot (tracking stops)
-        targetHead = nil -- Stop tracking when right-click is released
-    end
-end)
-
--- Update the camera to track the target's head if the aimbot is enabled
-game:GetService("RunService").RenderStepped:Connect(function()
-    if aimbotEnabled and targetHead then
-        aimAtTarget() -- Call the function to aim at the target
     end
 end)
